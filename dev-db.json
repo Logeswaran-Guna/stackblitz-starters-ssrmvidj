@@ -1,0 +1,38 @@
+{
+  "users": [
+    {
+      "id": "ea1a29a3-7c6d-4d9d-91ef-6a6ee8765572",
+      "role": "PARENT",
+      "name": "Radha Krishnan",
+      "phone": "9876543210",
+      "email": null,
+      "consentAt": "2026-08-01T14:42:38.258Z",
+      "createdAt": "2026-08-01T14:42:38.258Z"
+    }
+  ],
+  "studentProfiles": [
+    {
+      "id": "ffecb492-6e1e-4c20-9e61-bdf43d56bceb",
+      "parentId": "ea1a29a3-7c6d-4d9d-91ef-6a6ee8765572",
+      "studentName": "Meera S.",
+      "ageGrade": "Class 10",
+      "gender": null,
+      "notes": null
+    }
+  ],
+  "teacherProfiles": [],
+  "requirements": [
+    {
+      "id": "909a5e8c-e25e-49f3-b332-eec91e6af155",
+      "parentId": "ea1a29a3-7c6d-4d9d-91ef-6a6ee8765572",
+      "subject": "Mathematics",
+      "mode": "HOME_TUITION",
+      "location": "RS Puram, Coimbatore",
+      "schedulePref": null,
+      "pricingType": null,
+      "budget": 3500,
+      "status": "open",
+      "createdAt": "2026-08-01T14:44:05.423Z"
+    }
+  ]
+}
