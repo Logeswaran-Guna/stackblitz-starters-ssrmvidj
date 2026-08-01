@@ -2,22 +2,46 @@ const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
 const { requireAuth, requireRole } = require('../middleware/auth');
+
 const router = express.Router();
+
 router.put('/me', requireAuth, requireRole('TEACHER'), (req, res) => {
   const { qualification, experience, subjects, serviceArea, availability, rateExpectation, bankUpiRef } = req.body;
-  const existing = db.prepare('SELECT id FROM teacher_profiles WHERE user_id = ?').get(req.user.id);
-  if (existing) {
-    db.prepare(`UPDATE teacher_profiles SET qualification=?, experience=?, subjects=?, service_area=?, availability=?, rate_expectation=?, bank_upi_ref=? WHERE user_id = ?`).run(qualification || null, experience || null, JSON.stringify(subjects || []), serviceArea || null, JSON.stringify(availability || []), rateExpectation || null, bankUpiRef || null, req.user.id);
+
+  const data = db.load();
+  let profile = data.teacherProfiles.find(t => t.userId === req.user.id);
+
+  const updated = {
+    qualification: qualification || null,
+    experience: experience || null,
+    subjects: subjects || [],
+    serviceArea: serviceArea || null,
+    availability: availability || [],
+    rateExpectation: rateExpectation || null,
+    bankUpiRef: bankUpiRef || null,
+  };
+
+  if (profile) {
+    Object.assign(profile, updated);
   } else {
-    db.prepare(`INSERT INTO teacher_profiles (id, user_id, qualification, experience, subjects, service_area, availability, rate_expectation, bank_upi_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(crypto.randomUUID(), req.user.id, qualification || null, experience || null, JSON.stringify(subjects || []), serviceArea || null, JSON.stringify(availability || []), rateExpectation || null, bankUpiRef || null);
+    profile = { id: crypto.randomUUID(), userId: req.user.id, kycStatus: 'PENDING', rating: null, ...updated };
+    data.teacherProfiles.push(profile);
   }
-  const profile = db.prepare('SELECT * FROM teacher_profiles WHERE user_id = ?').get(req.user.id);
+
+  db.save(data);
   res.json(profile);
 });
+
 router.get('/', requireAuth, requireRole('ADMIN'), (req, res) => {
-  const teachers = db.prepare(`SELECT t.*, u.name, u.phone, u.email FROM teacher_profiles t JOIN users u ON u.id = t.user_id`).all();
+  const data = db.load();
   const { subject } = req.query;
-  const filtered = subject ? teachers.filter(t => JSON.parse(t.subjects || '[]').includes(subject)) : teachers;
-  res.json(filtered);
+  const teachers = data.teacherProfiles
+    .map(t => {
+      const user = data.users.find(u => u.id === t.userId);
+      return { ...t, name: user?.name, phone: user?.phone, email: user?.email };
+    })
+    .filter(t => !subject || (t.subjects || []).includes(subject));
+  res.json(teachers);
 });
+
 module.exports = router;

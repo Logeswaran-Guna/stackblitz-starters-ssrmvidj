@@ -8,6 +8,33 @@
       "email": null,
       "consentAt": "2026-08-01T14:42:38.258Z",
       "createdAt": "2026-08-01T14:42:38.258Z"
+    },
+    {
+      "id": "a143fe68-37df-40c5-9082-3e4b2e67cbc1",
+      "role": "PARENT",
+      "name": "Parent A",
+      "phone": "9000000001",
+      "email": null,
+      "consentAt": "2026-08-01T15:46:26.739Z",
+      "createdAt": "2026-08-01T15:46:26.739Z"
+    },
+    {
+      "id": "271ce095-643c-4fd9-ae22-818ad622daab",
+      "role": "TEACHER",
+      "name": "Teacher A",
+      "phone": "9000000002",
+      "email": null,
+      "consentAt": "2026-08-01T15:47:18.227Z",
+      "createdAt": "2026-08-01T15:47:18.227Z"
+    },
+    {
+      "id": "b04643e0-6477-484e-bf22-2b2cd4516bb4",
+      "role": "ADMIN",
+      "name": "Admin A",
+      "phone": "9000000003",
+      "email": null,
+      "consentAt": "2026-08-01T15:48:30.923Z",
+      "createdAt": "2026-08-01T15:48:30.923Z"
     }
   ],
   "studentProfiles": [
@@ -18,9 +45,33 @@
       "ageGrade": "Class 10",
       "gender": null,
       "notes": null
+    },
+    {
+      "id": "512a3d6a-5c19-4add-8abc-b0e9907038d3",
+      "parentId": "a143fe68-37df-40c5-9082-3e4b2e67cbc1",
+      "studentName": "Kid A",
+      "ageGrade": "Class 9",
+      "gender": null,
+      "notes": null
     }
   ],
-  "teacherProfiles": [],
+  "teacherProfiles": [
+    {
+      "id": "f8500610-1048-457d-be09-5b53b608913f",
+      "userId": "271ce095-643c-4fd9-ae22-818ad622daab",
+      "qualification": "M.Sc Physics",
+      "experience": null,
+      "subjects": [
+        "Physics"
+      ],
+      "serviceArea": "Coimbatore",
+      "availability": [],
+      "rateExpectation": null,
+      "kycStatus": "PENDING",
+      "bankUpiRef": null,
+      "rating": null
+    }
+  ],
   "requirements": [
     {
       "id": "909a5e8c-e25e-49f3-b332-eec91e6af155",
@@ -33,6 +84,58 @@
       "budget": 3500,
       "status": "open",
       "createdAt": "2026-08-01T14:44:05.423Z"
+    },
+    {
+      "id": "083171e7-7c02-49f7-a326-78086c91ead4",
+      "parentId": "a143fe68-37df-40c5-9082-3e4b2e67cbc1",
+      "subject": "Physics",
+      "mode": "ONLINE",
+      "location": null,
+      "schedulePref": null,
+      "pricingType": null,
+      "budget": null,
+      "status": "open",
+      "createdAt": "2026-08-01T16:41:02.577Z"
+    }
+  ],
+  "matches": [
+    {
+      "id": "8cac85fd-d493-48d7-ac64-fc866d48c9e6",
+      "requirementId": "083171e7-7c02-49f7-a326-78086c91ead4",
+      "teacherId": "f8500610-1048-457d-be09-5b53b608913f",
+      "matchScore": 0.92,
+      "status": "CONFIRMED",
+      "createdAt": "2026-08-01T16:43:11.979Z",
+      "demoBookedAt": "2026-08-01T16:44:44.166Z",
+      "confirmedAt": "2026-08-01T16:45:51.765Z"
+    }
+  ],
+  "sessions": [
+    {
+      "id": "3df8f331-37f0-44d8-b1c9-fb4e1749a84f",
+      "matchId": "8cac85fd-d493-48d7-ac64-fc866d48c9e6",
+      "date": "2026-08-05",
+      "timeSlot": "6:00 PM",
+      "teacherMarkedAt": "2026-08-01T16:46:35.770Z",
+      "parentConfirmedAt": "2026-08-01T16:48:20.540Z",
+      "adminValidatedAt": "2026-08-01T16:48:53.726Z",
+      "status": "ADMIN_VALIDATED",
+      "amount": 800,
+      "payoutId": "ac838ec0-a0b6-471d-a9ec-75d76f47c4d9"
+    }
+  ],
+  "payouts": [
+    {
+      "id": "ac838ec0-a0b6-471d-a9ec-75d76f47c4d9",
+      "teacherId": "f8500610-1048-457d-be09-5b53b608913f",
+      "period": "Aug-2026",
+      "amount": 720,
+      "commissionDeducted": 80,
+      "status": "RELEASED",
+      "releasedAt": "2026-08-01T16:49:18.981Z",
+      "sessionIds": [
+        "3df8f331-37f0-44d8-b1c9-fb4e1749a84f"
+      ]
     }
   ]
 }
