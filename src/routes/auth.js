@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../db');
+const { nextDailyId } = require('../idgen');
 const { JWT_SECRET, requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -45,8 +46,13 @@ router.post('/verify-otp', (req, res) => {
       return res.status(400).json({ error: 'Terms & Privacy consent is required' });
     }
     const finalRole = role === 'TEACHER' ? 'TEACHER' : 'PARENT';
+    const displayId = finalRole === 'TEACHER'
+      ? nextDailyId(data, 'teacherDaily', 'FMTEACH')
+      : nextDailyId(data, 'parentDaily', 'FMPAR');
+
     user = {
       id: crypto.randomUUID(),
+      displayId,
       role: finalRole,
       name,
       phone,
@@ -55,27 +61,19 @@ router.post('/verify-otp', (req, res) => {
       createdAt: new Date().toISOString(),
     };
     data.users.push(user);
-
-    if (finalRole === 'TEACHER') {
-      data.teacherProfiles.push({
-        id: crypto.randomUUID(), userId: user.id, qualification: null, experience: null,
-        subjects: [], serviceArea: null, availability: [], rateExpectation: null,
-        kycStatus: 'PENDING', bankUpiRef: null, rating: null,
-      });
-    }
     db.save(data);
   }
 
   const token = jwt.sign({ id: user.id, role: user.role, phone: user.phone }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ ok: true, token, user: { id: user.id, name: user.name, role: user.role, phone: user.phone } });
+  res.json({ ok: true, token, user: { id: user.id, displayId: user.displayId, name: user.name, role: user.role, phone: user.phone } });
 });
 
 router.get('/me', requireAuth, (req, res) => {
   const data = db.load();
   const user = data.users.find(u => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
-  const { id, name, role, phone, email } = user;
-  res.json({ id, name, role, phone, email });
+  const { id, displayId, name, role, phone, email } = user;
+  res.json({ id, displayId, name, role, phone, email });
 });
 
 module.exports = router;

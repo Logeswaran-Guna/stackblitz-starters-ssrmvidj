@@ -6,25 +6,46 @@ const { requireAuth, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
 router.put('/me', requireAuth, requireRole('TEACHER'), (req, res) => {
-  const { qualification, experience, subjects, serviceArea, availability, rateExpectation, bankUpiRef } = req.body;
+  const {
+    qualification, experience, subjects, availability, timeSlot,
+    rateExpectation, bankUpiRef, address, areaCity, pincode, whatsapp,
+  } = req.body;
 
   const data = db.load();
+  const user = data.users.find(u => u.id === req.user.id);
   let profile = data.teacherProfiles.find(t => t.userId === req.user.id);
 
   const updated = {
     qualification: qualification || null,
     experience: experience || null,
     subjects: subjects || [],
-    serviceArea: serviceArea || null,
-    availability: availability || [],
+    // "availability" is stored as an array for future multi-slot support; a
+    // single dropdown pick from the UI is sent as [timeSlot].
+    availability: availability || (timeSlot ? [timeSlot] : []),
     rateExpectation: rateExpectation || null,
     bankUpiRef: bankUpiRef || null,
+    address: address || null,
+    areaCity: areaCity || null,
+    pincode: pincode || null,
+    whatsapp: whatsapp || null,
   };
 
   if (profile) {
-    Object.assign(profile, updated);
+    Object.entries(updated).forEach(([key, val]) => {
+      if (val !== null && val !== undefined && !(Array.isArray(val) && val.length === 0)) {
+        profile[key] = val;
+      }
+    });
+    if (!profile.displayId && user) profile.displayId = user.displayId;
   } else {
-    profile = { id: crypto.randomUUID(), userId: req.user.id, kycStatus: 'PENDING', rating: null, ...updated };
+    profile = {
+      id: crypto.randomUUID(),
+      displayId: user ? user.displayId : null, // same FMTEACH... ID issued at signup
+      userId: req.user.id,
+      kycStatus: 'PENDING',
+      rating: null,
+      ...updated,
+    };
     data.teacherProfiles.push(profile);
   }
 

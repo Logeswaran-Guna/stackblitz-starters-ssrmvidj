@@ -1,9 +1,8 @@
-// Section 4.3 — Attendance & Payout Ledger. The platform's core trust
-// mechanism: Class conducted -> Teacher marks attendance -> Parent confirms
-// -> Future Minds validates -> Payout released.
+// Section 4.3 — Attendance & Payout Ledger.
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
+const { matchDisplayId } = require('../idgen');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -11,14 +10,42 @@ const router = express.Router();
 function getOwnTeacherProfile(data, userId) {
   return data.teacherProfiles.find(t => t.userId === userId);
 }
+function findMatchByAnyId(data, idOrDisplayId) {
+  return data.matches.find(m => m.id === idOrDisplayId || matchDisplayId(m) === idOrDisplayId);
+}
+function findTeacherByAnyId(data, idOrDisplayId) {
+  return data.teacherProfiles.find(t => t.id === idOrDisplayId || t.displayId === idOrDisplayId);
+}
 
-// POST /attendance/sessions — teacher logs a class taught against a CONFIRMED match
+function deriveTrackingFields(session, data) {
+  const parentApproval =
+    session.status === 'LOGGED' ? 'PENDING' :
+    session.status === 'DISPUTED' ? 'DISPUTED' :
+    'APPROVED';
+  const adminApproval =
+    session.status === 'ADMIN_VALIDATED' ? 'APPROVED' : 'PENDING';
+
+  let payout = null;
+  if (session.payoutId) payout = data.payouts.find(p => p.id === session.payoutId) || null;
+
+  return {
+    parentApproval,
+    adminApproval,
+    paymentReleased: !!payout,
+    payoutAmount: payout ? payout.amount : null,
+    payoutCommissionPercent: payout ? payout.commissionPercent : null,
+    payoutReleasedAt: payout ? payout.releasedAt : null,
+  };
+}
+
+// POST /attendance/sessions — teacher logs a class taught. matchId accepts the
+// internal id or the FMAPPROVED... display ID (the only valid stage to log against).
 router.post('/sessions', requireAuth, requireRole('TEACHER'), (req, res) => {
   const { matchId, date, timeSlot, amount } = req.body;
   if (!matchId || !date) return res.status(400).json({ error: 'matchId and date are required' });
 
   const data = db.load();
-  const match = data.matches.find(m => m.id === matchId);
+  const match = findMatchByAnyId(data, matchId);
   if (!match) return res.status(404).json({ error: 'Match not found' });
 
   const ownTeacher = getOwnTeacherProfile(data, req.user.id);
@@ -26,18 +53,19 @@ router.post('/sessions', requireAuth, requireRole('TEACHER'), (req, res) => {
     return res.status(403).json({ error: 'Not your match' });
   }
   if (match.status !== 'CONFIRMED') {
-    return res.status(400).json({ error: 'Match must be CONFIRMED before logging classes' });
+    return res.status(400).json({ error: 'Match must be CONFIRMED (an FMAPPROVED... ID) before logging classes' });
   }
 
   const session = {
     id: crypto.randomUUID(),
-    matchId,
+    matchId: match.id,
+    matchDisplayId: matchDisplayId(match),
     date,
     timeSlot: timeSlot || null,
     teacherMarkedAt: new Date().toISOString(),
     parentConfirmedAt: null,
     adminValidatedAt: null,
-    status: 'LOGGED', // LOGGED -> PARENT_CONFIRMED -> ADMIN_VALIDATED (or DISPUTED)
+    status: 'LOGGED',
     amount: amount || null,
     payoutId: null,
   };
@@ -46,7 +74,6 @@ router.post('/sessions', requireAuth, requireRole('TEACHER'), (req, res) => {
   res.status(201).json(session);
 });
 
-// PUT /attendance/sessions/:id/confirm — parent confirms the class actually happened
 router.put('/sessions/:id/confirm', requireAuth, requireRole('PARENT'), (req, res) => {
   const data = db.load();
   const session = data.sessions.find(s => s.id === req.params.id);
@@ -67,7 +94,6 @@ router.put('/sessions/:id/confirm', requireAuth, requireRole('PARENT'), (req, re
   res.json(session);
 });
 
-// PUT /attendance/sessions/:id/dispute — parent flags a discrepancy instead of confirming
 router.put('/sessions/:id/dispute', requireAuth, requireRole('PARENT'), (req, res) => {
   const data = db.load();
   const session = data.sessions.find(s => s.id === req.params.id);
@@ -86,8 +112,6 @@ router.put('/sessions/:id/dispute', requireAuth, requireRole('PARENT'), (req, re
   res.json(session);
 });
 
-// PUT /attendance/sessions/:id/validate — admin validates a parent-confirmed session
-// (this is what makes it eligible for payout)
 router.put('/sessions/:id/validate', requireAuth, requireRole('ADMIN'), (req, res) => {
   const data = db.load();
   const session = data.sessions.find(s => s.id === req.params.id);
@@ -102,7 +126,6 @@ router.put('/sessions/:id/validate', requireAuth, requireRole('ADMIN'), (req, re
   res.json(session);
 });
 
-// GET /attendance/sessions?matchId=... — role-scoped visibility
 router.get('/sessions', requireAuth, (req, res) => {
   const data = db.load();
   const { matchId, status } = req.query;
@@ -127,20 +150,34 @@ router.get('/sessions', requireAuth, (req, res) => {
     sessions = sessions.filter(s => ownMatchIds.has(s.matchId));
   }
 
-  res.json(sessions);
+  const enriched = sessions.map(s => ({ ...s, ...deriveTrackingFields(s, data) }));
+  res.json(enriched);
 });
 
 // POST /attendance/payouts — admin releases payout for a teacher's validated,
-// not-yet-paid sessions
+// not-yet-paid sessions. Requires the teacher to have bank/UPI details on file.
+//
+// Per the founder's design: since a CONFIRMED match (FMAPPROVED... ID) ties to
+// exactly one teacher, you can pass `matchId` INSTEAD of `teacherId` and the
+// teacher is resolved automatically from that match.
 router.post('/payouts', requireAuth, requireRole('ADMIN'), (req, res) => {
-  const { teacherId, period, commissionPercent } = req.body;
-  if (!teacherId) return res.status(400).json({ error: 'teacherId is required' });
-
+  let { teacherId, matchId, period, commissionPercent } = req.body;
   const data = db.load();
-  const teacher = data.teacherProfiles.find(t => t.id === teacherId);
-  if (!teacher) return res.status(404).json({ error: 'Teacher profile not found' });
 
-  const ownMatchIds = new Set(data.matches.filter(m => m.teacherId === teacherId).map(m => m.id));
+  if (!teacherId && matchId) {
+    const match = findMatchByAnyId(data, matchId);
+    if (!match) return res.status(404).json({ error: 'Match not found for that ID' });
+    teacherId = match.teacherId;
+  }
+  if (!teacherId) return res.status(400).json({ error: 'Provide teacherId, or a matchId (FMAPPROVED...) to resolve it automatically' });
+
+  const teacher = findTeacherByAnyId(data, teacherId);
+  if (!teacher) return res.status(404).json({ error: 'Teacher profile not found' });
+  if (!teacher.bankUpiRef) {
+    return res.status(400).json({ error: 'Teacher has no bank/UPI details on file — cannot release payout until they add one' });
+  }
+
+  const ownMatchIds = new Set(data.matches.filter(m => m.teacherId === teacher.id).map(m => m.id));
   const eligibleSessions = data.sessions.filter(
     s => ownMatchIds.has(s.matchId) && s.status === 'ADMIN_VALIDATED' && !s.payoutId
   );
@@ -150,29 +187,30 @@ router.post('/payouts', requireAuth, requireRole('ADMIN'), (req, res) => {
   }
 
   const grossAmount = eligibleSessions.reduce((sum, s) => sum + (s.amount || 0), 0);
-  const commissionDeducted = commissionPercent
-    ? Math.round(grossAmount * (commissionPercent / 100))
-    : 0;
+  const pct = commissionPercent || 0;
+  const commissionDeducted = Math.round(grossAmount * (pct / 100));
 
   const payout = {
     id: crypto.randomUUID(),
-    teacherId,
+    teacherId: teacher.id,
+    teacherDisplayId: teacher.displayId,
     period: period || null,
-    amount: grossAmount - commissionDeducted,
+    grossAmount,
+    commissionPercent: pct,
     commissionDeducted,
+    amount: grossAmount - commissionDeducted,
+    bankUpiRef: teacher.bankUpiRef,
     status: 'RELEASED',
     releasedAt: new Date().toISOString(),
     sessionIds: eligibleSessions.map(s => s.id),
   };
   data.payouts.push(payout);
-
   eligibleSessions.forEach(s => { s.payoutId = payout.id; });
 
   db.save(data);
   res.status(201).json(payout);
 });
 
-// GET /attendance/payouts — admin sees all; teacher sees their own
 router.get('/payouts', requireAuth, (req, res) => {
   const data = db.load();
   let payouts = data.payouts;

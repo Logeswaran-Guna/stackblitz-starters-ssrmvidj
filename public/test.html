@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Future Minds — API Test Console</title>
+<style>
+  :root{
+    --navy-900:#12233F; --navy-800:#1F3A5F; --amber-400:#C79A45; --amber-bright:#E0B764;
+    --border:#2A3F5C; --bg:#0B1729; --panel-bg:#132844; --muted:#93A5C2;
+    --ink:#EAF0F8; --ok:#4E9E6E; --err:#C1543F; --pending:#B08A3E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px;
+  }
+  header{
+    padding:18px 24px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+  header h1{ font-size:17px; margin:0; font-weight:700; }
+  header h1 span{ color:var(--amber-bright); }
+  header p{ margin:2px 0 0; color:var(--muted); font-size:12px; }
+  .layout{ display:grid; grid-template-columns:1.3fr 1fr; gap:0; min-height:calc(100vh - 64px); }
+  @media (max-width:980px){ .layout{ grid-template-columns:1fr; } }
+
+  .tabs{ display:flex; gap:6px; padding:14px 20px 0; border-bottom:1px solid var(--border); }
+  .tab-btn{
+    background:none; border:none; color:var(--muted); padding:9px 16px; font-size:13px; font-weight:600;
+    border-radius:8px 8px 0 0; cursor:pointer; border:1px solid transparent; border-bottom:none;
+  }
+  .tab-btn.active{ color:var(--ink); background:var(--panel-bg); border-color:var(--border); }
+  .tab-panel{ display:none; padding:20px; }
+  .tab-panel.active{ display:block; }
+
+  .session-box{
+    display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px;
+    background:var(--panel-bg); border:1px solid var(--border); margin-bottom:16px; flex-wrap:wrap;
+  }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--err); flex-shrink:0; }
+  .dot.on{ background:var(--ok); }
+  .session-box .label{ font-size:12px; color:var(--muted); }
+  .session-box .who{ font-size:13px; font-weight:600; }
+  .session-box button{ margin-left:auto; }
+
+  .card{
+    background:var(--panel-bg); border:1px solid var(--border); border-radius:10px;
+    padding:16px; margin-bottom:14px;
+  }
+  .card h3{ margin:0 0 4px; font-size:13.5px; }
+  .card p.hint{ margin:0 0 12px; color:var(--muted); font-size:11.5px; }
+  .card code.route{
+    font-family:'SF Mono',Consolas,monospace; font-size:10.5px; color:var(--amber-bright);
+    background:rgba(199,154,69,0.08); padding:2px 6px; border-radius:4px;
+  }
+
+  .field{ margin-bottom:10px; }
+  .field label{ display:block; font-size:11.5px; color:var(--muted); margin-bottom:4px; }
+  .field input, .field select, .field textarea{
+    width:100%; padding:8px 10px; background:#0E1D33; border:1px solid var(--border); border-radius:7px;
+    color:var(--ink); font-size:13px; font-family:inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{ outline:1.5px solid var(--amber-400); border-color:var(--amber-400); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .checkbox-field{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .checkbox-field input{ width:auto; }
+  .checkbox-field label{ margin:0; font-size:12.5px; color:var(--ink); }
+
+  button.btn{
+    background:var(--amber-400); color:#1A1200; border:none; padding:9px 16px; border-radius:7px;
+    font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  button.btn:hover{ background:var(--amber-bright); }
+  button.btn.ghost{ background:transparent; border:1px solid var(--border); color:var(--ink); font-weight:600; }
+  button.btn.ghost:hover{ border-color:var(--amber-400); color:var(--amber-bright); }
+  button.btn.small{ padding:6px 11px; font-size:11.5px; }
+  button.btn:disabled{ opacity:0.4; cursor:not-allowed; }
+
+  .stored-ids{ padding:14px 20px; border-top:1px solid var(--border); }
+  .stored-ids h4{ margin:0 0 10px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .id-chip{
+    display:flex; justify-content:space-between; gap:8px; align-items:center; background:#0E1D33;
+    border:1px solid var(--border); border-radius:6px; padding:6px 10px; margin-bottom:6px; font-size:11px;
+  }
+  .id-chip .k{ color:var(--muted); }
+  .id-chip .v{ font-family:monospace; color:var(--amber-bright); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; }
+
+  .log-panel{ border-left:1px solid var(--border); display:flex; flex-direction:column; height:100%; }
+  .log-panel-head{ padding:14px 18px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .log-panel-head h3{ margin:0; font-size:13px; }
+  .log-list{ flex:1; overflow-y:auto; padding:12px 16px; max-height:calc(100vh - 64px); }
+  .log-entry{ border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px; background:#0E1D33; }
+  .log-entry .meta{ display:flex; gap:8px; align-items:center; font-size:11px; margin-bottom:6px; }
+  .log-entry .status{ font-weight:700; padding:1px 7px; border-radius:4px; }
+  .log-entry .status.ok{ background:rgba(78,158,110,0.18); color:var(--ok); }
+  .log-entry .status.err{ background:rgba(193,84,63,0.18); color:var(--err); }
+  .log-entry .route{ color:var(--amber-bright); font-family:monospace; }
+  .log-entry .time{ color:var(--muted); margin-left:auto; }
+  .log-entry pre{ margin:0; font-size:11px; white-space:pre-wrap; word-break:break-all; color:var(--ink); max-height:180px; overflow:auto; }
+  .empty-log{ color:var(--muted); font-size:12.5px; text-align:center; padding:30px 10px; }
+
+  .status-table{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  .status-table th{ text-align:left; padding:6px 8px; color:var(--muted); border-bottom:1px solid var(--border); font-weight:600; }
+  .status-table td{ padding:7px 8px; border-bottom:1px solid var(--border); }
+  .pill{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:10.5px; font-weight:700; }
+  .pill.pending{ background:rgba(176,138,62,0.18); color:var(--pending); }
+  .pill.approved{ background:rgba(78,158,110,0.18); color:var(--ok); }
+  .pill.disputed{ background:rgba(193,84,63,0.18); color:var(--err); }
+  .pill.yes{ background:rgba(78,158,110,0.18); color:var(--ok); }
+  .pill.no{ background:rgba(147,165,194,0.18); color:var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Future Minds <span>— API Test Console</span></h1>
+    <p>Dev-only tool. Click through the flow instead of typing curl commands. IDs auto-fill as you go.</p>
+  </div>
+</header>
+
+<div class="layout">
+  <div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="parent">Parent</button>
+      <button class="tab-btn" data-tab="teacher">Teacher</button>
+      <button class="tab-btn" data-tab="admin">Admin</button>
+    </div>
+
+    <!-- ===================== PARENT ===================== -->
+    <div class="tab-panel active" id="tab-parent">
+
+      <div class="session-box">
+        <span class="dot" id="dot-parent"></span>
+        <span class="label">Session:</span>
+        <span class="who" id="who-parent">Not signed in</span>
+        <button class="btn ghost small" onclick="clearSession('parent')">Sign out</button>
+      </div>
+
+      <div class="card">
+        <h3>Sign up / Sign in</h3>
+        <p class="hint"><code class="route">POST /auth/request-otp</code> → <code class="route">POST /auth/verify-otp</code></p>
+        <div class="row2">
+          <div class="field"><label>Phone</label><input id="p-phone" placeholder="9000000001"></div>
+          <div class="field"><label>Name (only needed first time)</label><input id="p-name" placeholder="Parent A"></div>
+        </div>
+        <button class="btn ghost" onclick="requestOtp('p-phone','p-otp-box')">Send OTP</button>
+        <div id="p-otp-box" style="display:none;margin-top:10px;">
+          <div class="field"><label>OTP</label><input id="p-otp" placeholder="6-digit code"></div>
+          <button class="btn" onclick="verifyOtp('parent','p-phone','p-otp','p-name')">Verify & Continue</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Submit a requirement ("Get Matched")</h3>
+        <p class="hint"><code class="route">POST /requirements</code> — Section 4.1</p>
+        <div class="row2">
+          <div class="field"><label>Subject</label><input id="req-subject" value="Mathematics"></div>
+          <div class="field"><label>Mode</label>
+            <select id="req-mode">
+              <option value="ONLINE">Online</option>
+              <option value="HOME_TUITION">Home Tuition</option>
+              <option value="TEACHER_LOCATION">Teacher Location</option>
+              <option value="COMMUNITY_POOLING">Community Pooling</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Location</label><input id="req-location" value="RS Puram, Coimbatore"></div>
+          <div class="field"><label>Budget (₹/month)</label><input id="req-budget" value="3500"></div>
+        </div>
+        <div class="field"><label>Time slot</label>
+          <select id="req-timeslot">
+            <option value="Weekday mornings">Weekday mornings</option>
+            <option value="Weekday evenings" selected>Weekday evenings</option>
+            <option value="Weekend only">Weekend only</option>
+            <option value="Flexible">Flexible</option>
+          </select>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Student name</label><input id="req-student-name" value="Meera S."></div>
+          <div class="field"><label>Age / Grade</label><input id="req-student-grade" value="Class 10"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Age</label><input id="req-student-age" value="15"></div>
+          <div class="field"><label>WhatsApp number</label><input id="req-student-whatsapp" placeholder="9999900001"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Address</label><input id="req-student-address" placeholder="House no, street"></div>
+          <div class="field"><label>Area / City</label><input id="req-student-area" placeholder="Old Pallavaram, Chennai"></div>
+        </div>
+        <div class="field"><label>Pincode</label><input id="req-student-pincode" placeholder="600043"></div>
+        <div class="field">
+          <label>Existing Student ID (leave blank for a new student — fill in to enroll the same child in another subject)</label>
+          <input id="req-student-id">
+        </div>
+        <div class="checkbox-field">
+          <input type="checkbox" id="req-consent" checked>
+          <label for="req-consent">Consent to be contacted</label>
+        </div>
+        <button class="btn" onclick="submitRequirement()">Submit requirement</button>
+      </div>
+
+      <div class="card">
+        <h3>My students</h3>
+        <p class="hint"><code class="route">GET /requirements/my-students</code> — copy an ID from here to enroll that child in another subject above</p>
+        <button class="btn ghost small" onclick="loadMyStudents()">Refresh my students</button>
+        <div id="my-students-table" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>My requirements</h3>
+        <p class="hint"><code class="route">GET /requirements/mine</code> — one FMREQ ID per subject; hand the right one to admin if a student has multiple subjects open</p>
+        <button class="btn ghost small" onclick="loadMyRequirements()">Refresh my requirements</button>
+        <div id="my-requirements-table" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>Respond to a proposed demo</h3>
+        <p class="hint"><code class="route">PUT /matches/:id/accept-demo</code> or <code class="route">/decline-demo</code> — admin proposes the slot first; both you and the teacher must accept</p>
+        <div class="field"><label>Match ID</label><input id="p-demo-match-id"></div>
+        <button class="btn" onclick="acceptDemo('p-demo-match-id','parent')">Accept demo</button>
+        <button class="btn ghost" onclick="declineDemo('p-demo-match-id','parent')" style="margin-left:8px;">Decline demo</button>
+      </div>
+
+      <div class="card">
+        <h3>Approve teacher (after the demo happens)</h3>
+        <p class="hint"><code class="route">PUT /matches/:id/approve-teacher</code> — this is the final step that assigns this teacher to you; the Match ID becomes your ongoing class ID</p>
+        <div class="field"><label>Match ID</label><input id="p-approve-match-id"></div>
+        <button class="btn" onclick="approveTeacher()">Approve teacher</button>
+      </div>
+
+      <div class="card">
+        <h3>View matches for my requirement</h3>
+        <p class="hint"><code class="route">GET /matches?requirementId=...</code></p>
+        <button class="btn ghost" onclick="viewMatches()">Refresh my matches</button>
+      </div>
+
+      <div class="card">
+        <h3>Confirm a class happened</h3>
+        <p class="hint"><code class="route">PUT /attendance/sessions/:id/confirm</code></p>
+        <div class="field"><label>Session ID</label><input id="p-session-id"></div>
+        <button class="btn" onclick="confirmSession()">Confirm attendance</button>
+        <button class="btn ghost" onclick="disputeSession()" style="margin-left:8px;">Dispute instead</button>
+      </div>
+
+      <div class="card">
+        <h3>My assignments — confirmed classes</h3>
+        <p class="hint"><code class="route">GET /assignments</code></p>
+        <button class="btn ghost small" onclick="loadAssignments('parent','p-assignments-table')">Refresh assignments</button>
+        <div id="p-assignments-table" style="margin-top:12px;"></div>
+      </div>
+
+    </div>
+
+    <!-- ===================== TEACHER ===================== -->
+    <div class="tab-panel" id="tab-teacher">
+
+      <div class="session-box">
+        <span class="dot" id="dot-teacher"></span>
+        <span class="label">Session:</span>
+        <span class="who" id="who-teacher">Not signed in</span>
+        <button class="btn ghost small" onclick="clearSession('teacher')">Sign out</button>
+      </div>
+
+      <div class="card">
+        <h3>Sign up / Sign in</h3>
+        <p class="hint"><code class="route">POST /auth/request-otp</code> → <code class="route">POST /auth/verify-otp</code></p>
+        <div class="row2">
+          <div class="field"><label>Phone</label><input id="t-phone" placeholder="9000000002"></div>
+          <div class="field"><label>Name (only needed first time)</label><input id="t-name" placeholder="Teacher A"></div>
+        </div>
+        <button class="btn ghost" onclick="requestOtp('t-phone','t-otp-box')">Send OTP</button>
+        <div id="t-otp-box" style="display:none;margin-top:10px;">
+          <div class="field"><label>OTP</label><input id="t-otp" placeholder="6-digit code"></div>
+          <button class="btn" onclick="verifyOtp('teacher','t-phone','t-otp','t-name')">Verify & Continue</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Register as a Tutor</h3>
+        <p class="hint"><code class="route">PUT /teachers/me</code> — Section 4.4</p>
+        <div class="row2">
+          <div class="field"><label>Qualification</label><input id="tr-qual" value="M.Sc Physics"></div>
+          <div class="field"><label>Subjects (comma separated)</label><input id="tr-subjects" value="Physics"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Service area</label><input id="tr-area" value="Coimbatore"></div>
+          <div class="field"><label>Expected rate (₹/month)</label><input id="tr-rate" value="3500"></div>
+        </div>
+        <div class="field"><label>Bank account / UPI ID (required before you can be paid out)</label><input id="tr-bank" placeholder="yourname@upi"></div>
+        <div class="row2">
+          <div class="field"><label>Address</label><input id="tr-address" placeholder="House no, street"></div>
+          <div class="field"><label>Area / City</label><input id="tr-area-city" placeholder="RS Puram, Coimbatore"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Pincode</label><input id="tr-pincode" placeholder="641002"></div>
+          <div class="field"><label>WhatsApp number</label><input id="tr-whatsapp" placeholder="9999900002"></div>
+        </div>
+        <div class="field"><label>Time slot</label>
+          <select id="tr-timeslot">
+            <option value="Weekday mornings">Weekday mornings</option>
+            <option value="Weekday evenings" selected>Weekday evenings</option>
+            <option value="Weekend only">Weekend only</option>
+            <option value="Flexible">Flexible</option>
+          </select>
+        </div>
+        <button class="btn" onclick="registerTeacherProfile()">Save profile</button>
+      </div>
+
+      <div class="card">
+        <h3>My assignments — confirmed classes across all my students</h3>
+        <p class="hint"><code class="route">GET /assignments</code> — since a teacher may have multiple students across morning/evening/weekend slots</p>
+        <button class="btn ghost small" onclick="loadAssignments('teacher','t-assignments-table')">Refresh assignments</button>
+        <div id="t-assignments-table" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>Respond to a proposed demo</h3>
+        <p class="hint"><code class="route">PUT /matches/:id/accept-demo</code> or <code class="route">/decline-demo</code> — the parent must also accept before the demo is scheduled</p>
+        <div class="field"><label>Match ID</label><input id="t-demo-match-id"></div>
+        <button class="btn" onclick="acceptDemo('t-demo-match-id','teacher')">Accept demo</button>
+        <button class="btn ghost" onclick="declineDemo('t-demo-match-id','teacher')" style="margin-left:8px;">Decline demo</button>
+      </div>
+
+      <div class="card">
+        <h3>Log a class taught</h3>
+        <p class="hint"><code class="route">POST /attendance/sessions</code> — match must be CONFIRMED (parent has approved you post-demo)</p>
+        <div class="field"><label>Match ID</label><input id="t-match-id"></div>
+        <div class="row3">
+          <div class="field"><label>Date</label><input id="t-date" value="2026-08-05"></div>
+          <div class="field"><label>Time slot</label><input id="t-slot" value="6:00 PM"></div>
+          <div class="field"><label>Amount (₹)</label><input id="t-amount" value="800"></div>
+        </div>
+        <button class="btn" onclick="logSession()">Log class</button>
+      </div>
+
+      <div class="card">
+        <h3>My classes — approval & payout status</h3>
+        <p class="hint"><code class="route">GET /attendance/sessions</code></p>
+        <button class="btn ghost small" onclick="loadSessionTable('teacher','teacher-sessions-table')">Refresh table</button>
+        <div id="teacher-sessions-table" style="margin-top:12px;"></div>
+      </div>
+
+    </div>
+
+    <!-- ===================== ADMIN ===================== -->
+    <div class="tab-panel" id="tab-admin">
+
+      <div class="session-box">
+        <span class="dot" id="dot-admin"></span>
+        <span class="label">Session:</span>
+        <span class="who" id="who-admin">Not signed in</span>
+        <button class="btn ghost small" onclick="clearSession('admin')">Sign out</button>
+      </div>
+
+      <div class="card">
+        <h3>Sign up / Sign in</h3>
+        <p class="hint">Signing up always lands as PARENT (by design — no public self-promotion to admin). Use the promote step below once.</p>
+        <div class="row2">
+          <div class="field"><label>Phone</label><input id="a-phone" placeholder="9000000003"></div>
+          <div class="field"><label>Name (only needed first time)</label><input id="a-name" placeholder="Admin A"></div>
+        </div>
+        <button class="btn ghost" onclick="requestOtp('a-phone','a-otp-box')">Send OTP</button>
+        <div id="a-otp-box" style="display:none;margin-top:10px;">
+          <div class="field"><label>OTP</label><input id="a-otp" placeholder="6-digit code"></div>
+          <button class="btn" onclick="verifyOtp('admin','a-phone','a-otp','a-name')">Verify & Continue</button>
+        </div>
+        <p class="hint" style="margin-top:10px;">One-time only: in the StackBlitz terminal, edit <code class="route">dev-db.json</code> to set this phone's user <code class="route">role</code> to <code class="route">"ADMIN"</code>, then sign in again here.</p>
+      </div>
+
+      <div class="card">
+        <h3>Create a match</h3>
+        <p class="hint"><code class="route">POST /matches</code> — Section 4.2</p>
+        <div class="field"><label>Requirement ID (FMREQ...)</label><input id="m-req-id"></div>
+        <div class="field"><label>Teacher Profile ID</label><input id="m-teacher-id"></div>
+        <div class="field"><label>Match score (0–1, optional)</label><input id="m-score" value="0.92"></div>
+        <button class="btn" onclick="createMatch()">Create match</button>
+      </div>
+
+      <div class="card">
+        <h3>Propose a demo</h3>
+        <p class="hint"><code class="route">PUT /matches/:id/propose-demo</code> — sends the slot to both parent and teacher; both must accept before it's scheduled</p>
+        <div class="field"><label>Match ID</label><input id="a-demo-match-id"></div>
+        <div class="row2">
+          <div class="field"><label>Date</label><input id="a-demo-date" value="2026-08-06"></div>
+          <div class="field"><label>Time slot</label><input id="a-demo-slot" value="5:00 PM"></div>
+        </div>
+        <button class="btn" onclick="proposeDemo()">Propose demo</button>
+      </div>
+
+      <div class="card">
+        <h3>Note: if a demo gets declined</h3>
+        <p class="hint" style="margin:0;">A declined match is dead — it can't be reopened. Go back to "Create a match" above and pick a different teacher (or a different requirement) to try again.</p>
+      </div>
+
+      <div class="card">
+        <h3>Validate a class session</h3>
+        <p class="hint"><code class="route">PUT /attendance/sessions/:id/validate</code></p>
+        <div class="field"><label>Session ID</label><input id="a-session-id"></div>
+        <button class="btn" onclick="validateSession()">Validate session</button>
+      </div>
+
+      <div class="card">
+        <h3>Release payout</h3>
+        <p class="hint"><code class="route">POST /attendance/payouts</code></p>
+        <div class="row3">
+          <div class="field"><label>Teacher Profile ID</label><input id="pay-teacher-id"></div>
+          <div class="field"><label>Period</label><input id="pay-period" value="Aug-2026"></div>
+          <div class="field"><label>Commission %</label><input id="pay-commission" value="10"></div>
+        </div>
+        <button class="btn" onclick="releasePayout()">Release payout</button>
+      </div>
+
+      <div class="card">
+        <h3>All confirmed assignments</h3>
+        <p class="hint"><code class="route">GET /assignments</code></p>
+        <button class="btn ghost small" onclick="loadAssignments('admin','a-assignments-table')">Refresh assignments</button>
+        <div id="a-assignments-table" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>All classes — approval & payout status</h3>
+        <p class="hint"><code class="route">GET /attendance/sessions</code> — parent approval, admin approval, and payment status for every class, across all teachers</p>
+        <button class="btn ghost small" onclick="loadSessionTable('admin','admin-sessions-table')">Refresh table</button>
+        <div id="admin-sessions-table" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>View raw data</h3>
+        <button class="btn ghost small" onclick="viewAll('/requirements')">All requirements</button>
+        <button class="btn ghost small" onclick="viewAll('/teachers')">All teachers</button>
+        <button class="btn ghost small" onclick="viewAll('/matches')">All matches</button>
+        <button class="btn ghost small" onclick="viewAll('/attendance/payouts')">All payouts</button>
+      </div>
+
+    </div>
+
+    <div class="stored-ids">
+      <h4>Captured IDs (auto-filled into fields above as they're created)</h4>
+      <div id="id-chips"></div>
+      <button class="btn ghost small" onclick="clearIds()">Clear captured IDs</button>
+    </div>
+  </div>
+
+  <div class="log-panel">
+    <div class="log-panel-head">
+      <h3>API Log</h3>
+      <button class="btn ghost small" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="log-list" id="log-list">
+      <div class="empty-log">Every request you make will show up here, with the exact endpoint and raw response — no more guessing what a curl command actually did.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- storage helpers ----------
+  const roles = ['parent','teacher','admin'];
+  function getToken(role){ return localStorage.getItem('fm_token_'+role) || ''; }
+  function setToken(role, token, userLabel){
+    localStorage.setItem('fm_token_'+role, token);
+    localStorage.setItem('fm_who_'+role, userLabel);
+    renderSession(role);
+  }
+  function clearSession(role){
+    localStorage.removeItem('fm_token_'+role);
+    localStorage.removeItem('fm_who_'+role);
+    renderSession(role);
+  }
+  function renderSession(role){
+    const token = getToken(role);
+    const who = localStorage.getItem('fm_who_'+role);
+    document.getElementById('dot-'+role).classList.toggle('on', !!token);
+    document.getElementById('who-'+role).textContent = token ? (who || 'Signed in') : 'Not signed in';
+  }
+  roles.forEach(renderSession);
+
+  const idKeys = ['requirementId','studentDisplayId','teacherProfileId','matchId','sessionId'];
+  const idLabels = { requirementId:'Requirement ID', studentDisplayId:'Student ID (FMSTU...)', teacherProfileId:'Teacher ID (FMTEACH...)', matchId:'Match ID (FMMATCH/FMDEMO/FMAPPROVED...)', sessionId:'Session ID' };
+  function getIds(){ try{ return JSON.parse(localStorage.getItem('fm_ids')||'{}'); }catch(e){ return {}; } }
+  function setId(key, val){
+    const ids = getIds(); ids[key] = val;
+    localStorage.setItem('fm_ids', JSON.stringify(ids));
+    renderIds();
+    autofillIds();
+  }
+  function clearIds(){ localStorage.removeItem('fm_ids'); renderIds(); }
+  function renderIds(){
+    const ids = getIds();
+    const box = document.getElementById('id-chips');
+    const present = idKeys.filter(k => ids[k]);
+    if(!present.length){ box.innerHTML = '<p class="hint" style="margin:0;">Nothing captured yet — create a requirement, teacher profile, match, or session and it\'ll show up here.</p>'; return; }
+    box.innerHTML = present.map(k => `<div class="id-chip"><span class="k">${idLabels[k]}</span><span class="v" title="${ids[k]}">${ids[k]}</span></div>`).join('');
+  }
+  function autofillIds(){
+    const ids = getIds();
+    const map = {
+      'p-demo-match-id': ids.matchId, 't-demo-match-id': ids.matchId, 'a-demo-match-id': ids.matchId,
+      'p-approve-match-id': ids.matchId, 't-match-id': ids.matchId,
+      'p-session-id': ids.sessionId, 'a-session-id': ids.sessionId,
+      'm-req-id': ids.requirementId,
+      'm-teacher-id': ids.teacherProfileId, 'pay-teacher-id': ids.teacherProfileId,
+    };
+    // Match ID changes its VALUE as status advances (FMMATCH -> FMDEMO -> FMAPPROVED),
+    // so those fields must always refresh to the latest — not just when empty.
+    const alwaysOverwrite = new Set(['p-demo-match-id','t-demo-match-id','a-demo-match-id','p-approve-match-id','t-match-id']);
+    Object.entries(map).forEach(([elId, val]) => {
+      const el = document.getElementById(elId);
+      if(!el || !val) return;
+      if(alwaysOverwrite.has(elId) || !el.value) el.value = val;
+    });
+  }
+  renderIds();
+  autofillIds();
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- API + logging ----------
+  async function api(method, path, body, role){
+    const headers = { 'Content-Type': 'application/json' };
+    if(role){
+      const token = getToken(role);
+      if(token) headers['Authorization'] = 'Bearer ' + token;
+    }
+    const started = new Date();
+    let status, json;
+    try{
+      const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      status = res.status;
+      json = await res.json().catch(()=>({}));
+    }catch(e){
+      status = 0; json = { error: 'Network error / server not reachable: ' + e.message };
+    }
+    logEntry(method, path, status, json, started);
+    return { status, json };
+  }
+
+  function logEntry(method, path, status, json, started){
+    const list = document.getElementById('log-list');
+    const empty = list.querySelector('.empty-log');
+    if(empty) empty.remove();
+    const ok = status >= 200 && status < 300;
+    const el = document.createElement('div');
+    el.className = 'log-entry';
+    el.innerHTML = `
+      <div class="meta">
+        <span class="status ${ok ? 'ok' : 'err'}">${status || 'ERR'}</span>
+        <span class="route">${method} ${path}</span>
+        <span class="time">${started.toLocaleTimeString()}</span>
+      </div>
+      <pre>${escapeHtml(JSON.stringify(json, null, 2))}</pre>
+    `;
+    list.prepend(el);
+  }
+  function escapeHtml(str){ return str.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function clearLog(){ document.getElementById('log-list').innerHTML = '<div class="empty-log">Log cleared.</div>'; }
+
+  // ---------- auth ----------
+  async function requestOtp(phoneFieldId, otpBoxId){
+    const phone = document.getElementById(phoneFieldId).value.trim();
+    if(!phone){ alert('Enter a phone number first'); return; }
+    const { status } = await api('POST', '/auth/request-otp', { phone });
+    if(status === 200) document.getElementById(otpBoxId).style.display = 'block';
+  }
+  async function verifyOtp(role, phoneFieldId, otpFieldId, nameFieldId){
+    const phone = document.getElementById(phoneFieldId).value.trim();
+    const otp = document.getElementById(otpFieldId).value.trim();
+    const name = document.getElementById(nameFieldId).value.trim();
+    const roleUpper = role.toUpperCase();
+    const body = name ? { phone, otp, name, role: roleUpper, consent: true } : { phone, otp };
+    const { status, json } = await api('POST', '/auth/verify-otp', body);
+    if(status === 200 && json.token){
+      const label = `${json.user.name} (${json.user.role}) — ${json.user.displayId || ''}`;
+      setToken(role, json.token, label);
+    }
+  }
+
+  // ---------- parent actions ----------
+  async function submitRequirement(){
+    const studentId = document.getElementById('req-student-id').value.trim();
+    const body = {
+      subject: document.getElementById('req-subject').value,
+      mode: document.getElementById('req-mode').value,
+      location: document.getElementById('req-location').value,
+      budget: Number(document.getElementById('req-budget').value) || null,
+      schedulePref: document.getElementById('req-timeslot').value,
+      consent: document.getElementById('req-consent').checked,
+      student: {
+        studentId: studentId || undefined,
+        studentName: document.getElementById('req-student-name').value,
+        ageGrade: document.getElementById('req-student-grade').value,
+        age: document.getElementById('req-student-age').value,
+        whatsapp: document.getElementById('req-student-whatsapp').value,
+        address: document.getElementById('req-student-address').value,
+        areaCity: document.getElementById('req-student-area').value,
+        pincode: document.getElementById('req-student-pincode').value,
+      },
+    };
+    const { status, json } = await api('POST', '/requirements', body, 'parent');
+    if(status === 201){
+      setId('requirementId', json.displayId || json.id);
+      if(json.studentDisplayId){
+        setId('studentDisplayId', json.studentDisplayId);
+        alert('Student ID (save this to enroll the same child in another subject): ' + json.studentDisplayId);
+      }
+    }
+  }
+  async function loadMyRequirements(){
+    const target = document.getElementById('my-requirements-table');
+    target.innerHTML = '<p class="hint" style="margin:0;">Loading…</p>';
+    const { status, json } = await api('GET', '/requirements/mine', null, 'parent');
+    if(status !== 200 || !json.length){
+      target.innerHTML = '<p class="hint" style="margin:0;">No requirements submitted yet.</p>';
+      return;
+    }
+    const rows = json.map(r => `<tr><td>${r.displayId||r.id}</td><td>${r.subject}</td><td>${r.studentName||'—'}</td><td>${r.status}</td></tr>`).join('');
+    target.innerHTML = `<table class="status-table"><thead><tr><th>Requirement ID</th><th>Subject</th><th>Student</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  async function loadMyStudents(){
+    const target = document.getElementById('my-students-table');
+    target.innerHTML = '<p class="hint" style="margin:0;">Loading…</p>';
+    const { status, json } = await api('GET', '/requirements/my-students', null, 'parent');
+    if(status !== 200 || !json.length){
+      target.innerHTML = '<p class="hint" style="margin:0;">No students yet.</p>';
+      return;
+    }
+    const rows = json.map(s => `<tr><td>${s.displayId||s.id}</td><td>${s.studentName||'—'}</td><td>${s.ageGrade||'—'}</td><td>${s.areaCity||'—'}</td></tr>`).join('');
+    target.innerHTML = `<table class="status-table"><thead><tr><th>Student ID</th><th>Name</th><th>Grade</th><th>Area</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+  async function viewMatches(){
+    const ids = getIds();
+    const path = ids.requirementId ? `/matches?requirementId=${ids.requirementId}` : '/matches';
+    await api('GET', path, null, 'parent');
+  }
+  async function acceptDemo(fieldId, role){
+    const id = document.getElementById(fieldId).value.trim();
+    if(!id){ alert('Enter a Match ID'); return; }
+    const { status, json } = await api('PUT', `/matches/${id}/accept-demo`, null, role);
+    if(status === 200 && json.displayId) setId('matchId', json.displayId);
+  }
+  async function declineDemo(fieldId, role){
+    const id = document.getElementById(fieldId).value.trim();
+    if(!id){ alert('Enter a Match ID'); return; }
+    const reason = prompt('Reason for declining (optional):') || '';
+    await api('PUT', `/matches/${id}/decline-demo`, { reason }, role);
+  }
+  async function approveTeacher(){
+    const id = document.getElementById('p-approve-match-id').value.trim();
+    if(!id){ alert('Enter a Match ID'); return; }
+    const { status, json } = await api('PUT', `/matches/${id}/approve-teacher`, null, 'parent');
+    if(status === 200 && json.displayId){
+      setId('matchId', json.displayId);
+      alert('Approved! Ongoing class ID: ' + json.displayId);
+    }
+  }
+  async function confirmSession(){
+    const id = document.getElementById('p-session-id').value.trim();
+    if(!id){ alert('Enter a Session ID'); return; }
+    await api('PUT', `/attendance/sessions/${id}/confirm`, null, 'parent');
+  }
+  async function disputeSession(){
+    const id = document.getElementById('p-session-id').value.trim();
+    if(!id){ alert('Enter a Session ID'); return; }
+    const reason = prompt('Reason for dispute (optional):') || '';
+    await api('PUT', `/attendance/sessions/${id}/dispute`, { reason }, 'parent');
+  }
+
+  // ---------- teacher actions ----------
+  async function registerTeacherProfile(){
+    const body = {
+      qualification: document.getElementById('tr-qual').value,
+      subjects: document.getElementById('tr-subjects').value.split(',').map(s=>s.trim()).filter(Boolean),
+      serviceArea: document.getElementById('tr-area').value,
+      rateExpectation: document.getElementById('tr-rate').value,
+      bankUpiRef: document.getElementById('tr-bank').value,
+      address: document.getElementById('tr-address').value,
+      areaCity: document.getElementById('tr-area-city').value,
+      pincode: document.getElementById('tr-pincode').value,
+      whatsapp: document.getElementById('tr-whatsapp').value,
+      timeSlot: document.getElementById('tr-timeslot').value,
+    };
+    const { status, json } = await api('PUT', '/teachers/me', body, 'teacher');
+    if(status === 200) setId('teacherProfileId', json.displayId || json.id);
+  }
+  async function logSession(){
+    const matchId = document.getElementById('t-match-id').value.trim();
+    if(!matchId){ alert('Enter the FMAPPROVED... Match ID'); return; }
+    const body = {
+      matchId,
+      date: document.getElementById('t-date').value,
+      timeSlot: document.getElementById('t-slot').value,
+      amount: Number(document.getElementById('t-amount').value) || null,
+    };
+    const { status, json } = await api('POST', '/attendance/sessions', body, 'teacher');
+    if(status === 201) setId('sessionId', json.id);
+  }
+
+  // ---------- admin actions ----------
+  async function createMatch(){
+    const body = {
+      requirementId: document.getElementById('m-req-id').value.trim(),
+      teacherId: document.getElementById('m-teacher-id').value.trim(),
+      matchScore: Number(document.getElementById('m-score').value) || null,
+    };
+    const { status, json } = await api('POST', '/matches', body, 'admin');
+    if(status === 201) setId('matchId', json.displayId);
+  }
+  async function proposeDemo(){
+    const id = document.getElementById('a-demo-match-id').value.trim();
+    if(!id){ alert('Enter a Match ID'); return; }
+    const body = {
+      date: document.getElementById('a-demo-date').value,
+      timeSlot: document.getElementById('a-demo-slot').value,
+    };
+    const { status, json } = await api('PUT', `/matches/${id}/propose-demo`, body, 'admin');
+    if(status === 200 && json.displayId) setId('matchId', json.displayId);
+  }
+  async function validateSession(){
+    const id = document.getElementById('a-session-id').value.trim();
+    if(!id){ alert('Enter a Session ID'); return; }
+    await api('PUT', `/attendance/sessions/${id}/validate`, null, 'admin');
+  }
+  async function releasePayout(){
+    const body = {
+      teacherId: document.getElementById('pay-teacher-id').value.trim(),
+      period: document.getElementById('pay-period').value,
+      commissionPercent: Number(document.getElementById('pay-commission').value) || 0,
+    };
+    await api('POST', '/attendance/payouts', body, 'admin');
+  }
+  async function viewAll(path){
+    await api('GET', path, null, 'admin');
+  }
+
+  // ---------- status tracking table (teacher & admin) ----------
+  function pill(kind, text){
+    return `<span class="pill ${kind}">${text}</span>`;
+  }
+  async function loadSessionTable(role, targetId){
+    const target = document.getElementById(targetId);
+    target.innerHTML = '<p class="hint" style="margin:0;">Loading…</p>';
+    const { status, json } = await api('GET', '/attendance/sessions', null, role);
+    if(status !== 200){
+      target.innerHTML = '<p class="hint" style="margin:0;">Could not load — check you\'re signed in on this tab.</p>';
+      return;
+    }
+    if(!json.length){
+      target.innerHTML = '<p class="hint" style="margin:0;">No classes logged yet.</p>';
+      return;
+    }
+    const rows = json.map(s => {
+      const parentPill = s.parentApproval === 'APPROVED' ? pill('approved','Approved')
+        : s.parentApproval === 'DISPUTED' ? pill('disputed','Disputed')
+        : pill('pending','Pending');
+      const adminPill = s.adminApproval === 'APPROVED' ? pill('approved','Approved') : pill('pending','Pending');
+      const paidPill = s.paymentReleased ? pill('yes','Yes') : pill('no','No');
+      const amount = s.payoutAmount != null ? `₹${s.payoutAmount}` : '—';
+      const commission = s.payoutCommissionPercent != null ? `${s.payoutCommissionPercent}%` : '—';
+      const releaseDate = s.payoutReleasedAt ? new Date(s.payoutReleasedAt).toLocaleDateString() : '—';
+      return `<tr>
+        <td>${s.date}${s.timeSlot ? ' · '+s.timeSlot : ''}</td>
+        <td>₹${s.amount ?? '—'}</td>
+        <td>${parentPill}</td>
+        <td>${adminPill}</td>
+        <td>${paidPill}</td>
+        <td>${releaseDate}</td>
+        <td>${amount}</td>
+        <td>${commission}</td>
+      </tr>`;
+    }).join('');
+    target.innerHTML = `
+      <table class="status-table">
+        <thead><tr>
+          <th>Class date</th><th>Amount</th><th>Parent approval</th><th>Admin approval</th>
+          <th>Paid?</th><th>Release date</th><th>Net paid</th><th>Commission %</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  // ---------- assignment / schedule table ----------
+  async function loadAssignments(role, targetId){
+    const target = document.getElementById(targetId);
+    target.innerHTML = '<p class="hint" style="margin:0;">Loading…</p>';
+    const { status, json } = await api('GET', '/assignments', null, role);
+    if(status !== 200){
+      target.innerHTML = '<p class="hint" style="margin:0;">Could not load — check you\'re signed in on this tab.</p>';
+      return;
+    }
+    if(!json.length){
+      target.innerHTML = '<p class="hint" style="margin:0;">No confirmed assignments yet.</p>';
+      return;
+    }
+    const rows = json.map(a => `<tr>
+      <td title="${a.id}">${a.displayId || a.id}</td>
+      <td>${a.studentName}</td>
+      <td>${a.class}</td>
+      <td>${a.subject}</td>
+      <td>${a.teacherName}</td>
+      <td>${a.address}${a.areaCity !== '—' ? ', '+a.areaCity : ''}</td>
+      <td>${a.timeSlot}</td>
+      <td>${a.fees !== '—' ? '₹'+a.fees : '—'}</td>
+    </tr>`).join('');
+    target.innerHTML = `
+      <table class="status-table">
+        <thead><tr>
+          <th>Unique ID</th><th>Student</th><th>Class</th><th>Subject</th><th>Teacher</th>
+          <th>Address</th><th>Time-Slot</th><th>Fees</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+</script>
+
+</body>
+</html>
