@@ -102,8 +102,9 @@ router.get('/', requireAuth, requireRole('ADMIN'), (req, res) => {
   res.json(withParent);
 });
 
-// GET /requirements/mine — parent's own requirements (one row per subject),
-// so they can hand the right FMREQ... ID to admin when multiple are open.
+// GET /requirements/mine — parent's own requirements (one row per subject).
+// Once a teacher is assigned, this also surfaces the teacher's name/ID/mobile,
+// the class/grade, subject, time slot, and training mode — not just "open".
 router.get('/mine', requireAuth, requireRole('PARENT'), (req, res) => {
   const data = db.load();
   const mine = data.requirements
@@ -111,7 +112,30 @@ router.get('/mine', requireAuth, requireRole('PARENT'), (req, res) => {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .map(r => {
       const student = data.studentProfiles.find(s => s.id === r.studentProfileId);
-      return { ...r, studentDisplayId: student?.displayId, studentName: student?.studentName };
+
+      // Prefer a CONFIRMED match; otherwise the most recent still-live match; else none.
+      const relatedMatches = data.matches.filter(m => m.requirementId === r.id);
+      const match = relatedMatches.find(m => m.status === 'CONFIRMED')
+        || relatedMatches.filter(m => m.status !== 'DECLINED').sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
+        || null;
+
+      let teacher = null, teacherUser = null;
+      if (match) {
+        teacher = data.teacherProfiles.find(t => t.id === match.teacherId);
+        teacherUser = teacher && data.users.find(u => u.id === teacher.userId);
+      }
+
+      return {
+        ...r,
+        studentDisplayId: student?.displayId,
+        studentName: student?.studentName,
+        studentGrade: student?.ageGrade,
+        matchStatus: match ? match.status : null, // null = no match created yet
+        teacherDisplayId: teacher?.displayId || null,
+        teacherName: teacherUser?.name || null,
+        teacherPhone: teacherUser?.phone || null,
+        timeSlot: match?.demoTimeSlot || r.schedulePref || null,
+      };
     });
   res.json(mine);
 });

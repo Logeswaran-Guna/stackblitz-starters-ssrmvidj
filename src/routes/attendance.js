@@ -2,7 +2,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const db = require('../db');
-const { matchDisplayId } = require('../idgen');
+const { matchDisplayId, nextDailyId } = require('../idgen');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,6 +15,9 @@ function findMatchByAnyId(data, idOrDisplayId) {
 }
 function findTeacherByAnyId(data, idOrDisplayId) {
   return data.teacherProfiles.find(t => t.id === idOrDisplayId || t.displayId === idOrDisplayId);
+}
+function findSessionByAnyId(data, idOrDisplayId) {
+  return data.sessions.find(s => s.id === idOrDisplayId || s.displayId === idOrDisplayId);
 }
 
 function deriveTrackingFields(session, data) {
@@ -58,6 +61,7 @@ router.post('/sessions', requireAuth, requireRole('TEACHER'), (req, res) => {
 
   const session = {
     id: crypto.randomUUID(),
+    displayId: nextDailyId(data, 'attendanceDaily', 'FMATTEND'),
     matchId: match.id,
     matchDisplayId: matchDisplayId(match),
     date,
@@ -76,7 +80,7 @@ router.post('/sessions', requireAuth, requireRole('TEACHER'), (req, res) => {
 
 router.put('/sessions/:id/confirm', requireAuth, requireRole('PARENT'), (req, res) => {
   const data = db.load();
-  const session = data.sessions.find(s => s.id === req.params.id);
+  const session = findSessionByAnyId(data, req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
   const match = data.matches.find(m => m.id === session.matchId);
@@ -96,7 +100,7 @@ router.put('/sessions/:id/confirm', requireAuth, requireRole('PARENT'), (req, re
 
 router.put('/sessions/:id/dispute', requireAuth, requireRole('PARENT'), (req, res) => {
   const data = db.load();
-  const session = data.sessions.find(s => s.id === req.params.id);
+  const session = findSessionByAnyId(data, req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
 
   const match = data.matches.find(m => m.id === session.matchId);
@@ -114,7 +118,7 @@ router.put('/sessions/:id/dispute', requireAuth, requireRole('PARENT'), (req, re
 
 router.put('/sessions/:id/validate', requireAuth, requireRole('ADMIN'), (req, res) => {
   const data = db.load();
-  const session = data.sessions.find(s => s.id === req.params.id);
+  const session = findSessionByAnyId(data, req.params.id);
   if (!session) return res.status(404).json({ error: 'Session not found' });
   if (session.status !== 'PARENT_CONFIRMED') {
     return res.status(400).json({ error: 'Session must be PARENT_CONFIRMED before admin validation' });

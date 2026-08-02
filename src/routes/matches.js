@@ -224,6 +224,7 @@ router.put('/:id/approve-teacher', requireAuth, requireRole('PARENT'), (req, res
 
   match.status = 'CONFIRMED';
   match.parentApprovedAt = new Date().toISOString();
+  requirement.status = 'assigned'; // was previously never updated from 'open' — this was the bug
   db.save(data);
   const displayId = matchDisplayId(match);
   res.json({ ...match, displayId, note: `This is now your ongoing class ID: ${displayId} — use it to log/confirm sessions and for payouts.` });
