@@ -4,6 +4,19 @@
 -- broad cross-role SELECT policies on profiles/teacher_profiles. Each
 -- function is SECURITY DEFINER and scopes everything to auth.uid() itself.
 
+-- === public landing page: real, non-fabricated hero stats ===================
+-- Callable while signed out (see the explicit anon grant in 0006) — only
+-- returns aggregate counts, nothing identifying. "Onboarded" tutors means
+-- KYC-approved specifically, not just registered, so the number reflects
+-- vetted educators rather than raw signups.
+create or replace function public_landing_stats()
+returns table (tutors_onboarded int, classes_completed int)
+language sql security definer set search_path = public as $$
+  select
+    (select count(*) from teacher_profiles where kyc_status = 'APPROVED')::int,
+    (select count(*) from class_sessions where status in ('PARENT_CONFIRMED', 'ADMIN_VALIDATED'))::int;
+$$;
+
 -- === requirements.js: GET /requirements/mine ================================
 create or replace function my_requirements()
 returns table (
