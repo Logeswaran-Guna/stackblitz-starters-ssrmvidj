@@ -124,3 +124,7 @@ grant update (name, email) on profiles to authenticated; -- profile edits only; 
 -- function (find_match, match_display_id, next_daily_id, etc.) automatically.
 revoke execute on all functions in schema public from public;
 grant execute on all functions in schema public to authenticated;
+
+-- The landing page hero needs real stats before a visitor has signed in —
+-- the only function anon gets direct execute on.
+grant execute on function public_landing_stats() to anon;
